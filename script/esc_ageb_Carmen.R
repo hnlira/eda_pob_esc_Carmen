@@ -69,3 +69,93 @@ rm(variables, vec, censo2020)
 
 glimpse(ageb2020data)
 
+## Limpieza y procesado de denueCAM para filtrar solo valores instituciones 
+# educativas de Carmen 
+# Actividades de interes
+scian <- c(611111, 611112, # Preescolar 1 privado 2 particular
+           611121, 611122, # Primaria
+           611131, 611132, # Secundaria general
+           611141, 611142, # Secundaria técnica
+           611151, 611152, # Media técnica
+           611161, 611162, # Media superior
+           611211, 611212, # Técnica superior
+           611311, 611312) # Educación superior  
+
+# Variables de interés
+variables <- c(
+  "nom_estab", "nombre_act", 
+  "nomb_asent", "geometry", 
+  "CVEGEO"
+)
+
+# Crear base de datos filtrando municipios de interés, actividades de interés 
+denueESC <- denueCAM %>%
+  filter(municipio == "Carmen", codigo_act %in% scian) %>%
+  # Crear variable CVEGEO para unir a la ageb2020data
+  mutate(CVEGEO = paste(cve_ent, cve_mun, cve_loc, ageb, sep = "")) %>%
+  select(any_of(variables)) 
+rm(denueCAM, scian, variables)
+
+# Crear nuevas categorías para el nombre de actividad 
+denueESC$tipo_esc <- "a"
+denueESC$tipo_esc <- with(denueESC, 
+                          ifelse(denueESC$nombre_act == "Escuelas de educación preescolar del sector público",
+                                 "PREE_PUB", tipo_esc))
+denueESC$tipo_esc <- with(denueESC,
+                          ifelse(denueESC$nombre_act == "Escuelas de educación preescolar del sector privado",
+                                 "PREE_PRI", tipo_esc))
+denueESC$tipo_esc <- with(denueESC,
+                          ifelse(denueESC$nombre_act == "Escuelas de educación primaria del sector privado" ,
+                                 "PRIM_PRI", denueESC$tipo_esc))
+denueESC$tipo_esc <- with(denueESC,
+                          ifelse(denueESC$nombre_act == "Escuelas de educación primaria del sector público",
+                                 "PRIM_PUB", denueESC$tipo_esc))
+denueESC$tipo_esc <- with(denueESC,
+                          ifelse(denueESC$nombre_act == "Escuelas de educación secundaria general del sector público",
+                                 "SEC_PUB", denueESC$tipo_esc))
+denueESC$tipo_esc <- with(denueESC,
+                          ifelse(denueESC$nombre_act == "Escuelas de educación secundaria general del sector privado",
+                                 "SEC_PRI", denueESC$tipo_esc))
+denueESC$tipo_esc <- with(denueESC,
+                          ifelse(denueESC$nombre_act == "Escuelas de educación secundaria técnica del sector público" ,
+                                 "SECTEC_PUB", denueESC$tipo_esc))
+denueESC$tipo_esc <- with(denueESC,
+                          ifelse(denueESC$nombre_act == "Escuelas de educación media superior del sector público"  ,
+                                 "EMS_PUB", denueESC$tipo_esc))
+denueESC$tipo_esc <- with(denueESC,
+                          ifelse(denueESC$nombre_act == "Escuelas de educación media superior del sector privado"  ,
+                                 "EMS_PRI", denueESC$tipo_esc))
+denueESC$tipo_esc <- with(denueESC,
+                          ifelse(denueESC$nombre_act == "Escuelas de educación media técnica terminal del sector privado"  ,
+                                 "EMSTEC_PRI", denueESC$tipo_esc))
+denueESC$tipo_esc <- with(denueESC,
+                          ifelse(denueESC$nombre_act == "Escuelas de educación superior del sector privado" ,
+                                 "ESCSUP_PRI", denueESC$tipo_esc))
+denueESC$tipo_esc <- with(denueESC,
+                          ifelse(denueESC$nombre_act == "Escuelas de educación superior del sector público" ,
+                                 "ESCSUP_PUB", denueESC$tipo_esc))
+
+glimpse(denueESC)
+head(denueESC)
+
+# Crear tabla con el numero de escuelas por AGEB 
+denueAGEB <- denueESC %>%
+  # Se convierte a tibble para descartar que datos espaciales causen error 
+  as_tibble() %>% 
+  select(tipo_esc, CVEGEO) %>% 
+  count(CVEGEO, tipo_esc) %>%
+  pivot_wider(names_from = "tipo_esc", 
+              values_from = "n", 
+              values_fill = 0) %>%
+  mutate(total = rowSums(.[2:12]),
+  ) # obtener total de escuelas por AGEB
+
+glimpse(denueAGEB)
+head(denueAGEB)
+
+# Agregar denueAGEB a AGEBdata2020
+datos <- ageb2020data %>%
+  full_join(denueAGEB, by = "CVEGEO")
+rm(ageb2020data, denueAGEB)
+
+glimpse(datos)
