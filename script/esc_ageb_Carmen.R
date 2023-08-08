@@ -159,3 +159,56 @@ datos <- ageb2020data %>%
 rm(ageb2020data, denueAGEB)
 
 glimpse(datos)
+
+# Elegir solo datos para preescolares y primarias publicas y privadas 
+pres_prim <- datos %>%
+  select(CVEGEO, POBTOT, 
+         P_3A5, #P_3A5_F, P_3A5_M, 
+         P_6A11, #P_6A11_F, P_6A11_M, 
+         #P3A5_NOA, #P3A5_NOA_F, P3A5_NOA_M, 
+         #P6A11_NOA, #P6A11_NOAF, P6A11_NOAM, 
+         PREE_PUB, PREE_PRI, 
+         PRIM_PUB, PRIM_PRI) %>%
+  # Se crean variables con valores totales 
+  # Según las variables elegidas 
+  mutate(TOTAL = rowSums(.[5:8], na.rm = TRUE), 
+         TOTALPRIV = rowSums(.[c(6, 8)], na.rm = TRUE),
+         TOTALPUB = rowSums(.[c(5, 7)], na.rm = TRUE), 
+         TOTALPRIM = rowSums(. [c(7,8)], na.rm = TRUE), 
+         TOTALPREES = rowSums(. [c(5,6)], na.rm = TRUE)
+  )
+
+rm(datos)
+glimpse(pres_prim)
+
+# Crear denue_PRES_PRIM solo con preescolares y primarias de dataframe denueESC
+denue_PRES_PRIM <- denueESC %>%
+  filter(tipo_esc %in% c("PREE_PUB", 
+                         "PREE_PRI", 
+                         "PRIM_PUB", 
+                         "PRIM_PRI"))
+# Remover elementos utilizados
+rm(denueESC)
+
+# Unir datos a mapa 
+mapa_pree_prim <- agebmap %>%
+  filter(CVE_MUN == "003") %>%
+  left_join(pres_prim, by = "CVEGEO") %>%
+  select(-CVE_ENT, -CVE_LOC, -CVE_AGEB) 
+rm(agebmap)
+
+# Conocer las AGEB que se pierden de tabla datos al unir con capa espacial 
+pres_prim$CVEGEO[pres_prim$CVEGEO %in% mapa_pree_prim$CVEGEO == FALSE]
+# Crear vector con datos que coinciden para filtrar 
+sobrantes <- pres_prim$CVEGEO[pres_prim$CVEGEO %in% mapa_pree_prim$CVEGEO == TRUE] 
+
+# Eliminar de datos AGEB que no se integran a mapadatos 
+pres_prim <- pres_prim %>%
+  filter(CVEGEO %in% sobrantes)
+rm(sobrantes)
+# Comprobar eliminación de sobrantes
+pres_prim$CVEGEO[pres_prim$CVEGEO %in% mapa_pree_prim$CVEGEO == FALSE] 
+
+glimpse(pres_prim)
+glimpse(mapa_pree_prim)
+
